@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify, send_file, redirect
 import csv
 import os
 import math
@@ -19,7 +19,7 @@ def init_csv():
 
 @app.route("/")
 def index():
-    return "Servidor ativo"
+    return redirect("/live")
 
 @app.route("/dados", methods=["POST"])
 def receber_dados():
