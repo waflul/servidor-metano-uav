@@ -9,8 +9,8 @@ const char* ssid = "Bleh1234";
 const char* password = "bleh1234";
 
 
-//const char* serverUrl = "https://servidor-metano-uav.onrender.com/dados";
-const char* serverUrl = "http://172.20.10.13:5000/dados";
+const char* serverUrl = "https://servidor-metano-uav.onrender.com/dados";
+//const char* serverUrl = "http://172.20.10.13:5000/dados";
 
 
 const char* ntpServer = "pool.ntp.org";
