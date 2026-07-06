@@ -3,3 +3,4 @@ __pycache__/
 *.pyc
 dados_recebidos.csv
 dados_recebidos_antigo.csv
+.env
