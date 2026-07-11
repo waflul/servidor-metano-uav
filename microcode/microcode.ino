@@ -9,11 +9,8 @@
 
 // -------------------- Wi-Fi --------------------
 
-const char* ssid = "TP-Link_7848";
-const char* password = "90706963";
-
-//const char* ssid = "Bleh1234";
-//const char* password = "bleh1234";
+const char* ssid = "Bleh1234";
+const char* password = "bleh1234";
 
 const char* serverUrl = "https://servidor-metano-uav.onrender.com/dados";
 const char* commandUrl = "https://servidor-metano-uav.onrender.com/api/command";

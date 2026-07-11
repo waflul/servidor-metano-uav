@@ -846,45 +846,100 @@ def mapa():
                 }
             }
 
-            function rebuildHeatLayer(points) {
-                const heatData = [];
+            function clampMethaneValue(value) {
+                let numberValue = Number(value);
 
-                for (const point of points) {
-                    let intensity = Number(point.methane_percent);
-
-                    if (isNaN(intensity) || intensity < 0) {
-                        intensity = 0;
-                    }
-
-                    if (intensity > 100) {
-                        intensity = 100;
-                    }
-
-                    let normalizedIntensity = intensity / 100.0;
-
-                    if (normalizedIntensity < 0.05) {
-                        normalizedIntensity = 0.05;
-                    }
-
-                    heatData.push([
-                        point.latitude,
-                        point.longitude,
-                        normalizedIntensity
-                    ]);
+                if (isNaN(numberValue) || numberValue < 0) {
+                    numberValue = 0;
                 }
 
-                heatLayer = L.heatLayer(heatData, {
-                    radius: 32,
-                    blur: 24,
-                    maxZoom: 19,
-                    max: 1.0,
-                    gradient: {
-                        0.00: '#2ecc71',
-                        0.20: '#f1c40f',
-                        0.50: '#e67e22',
-                        0.80: '#e74c3c'
+                if (numberValue > 100) {
+                    numberValue = 100;
+                }
+
+                return numberValue;
+            }
+
+            function rebuildHeatLayer(points) {
+                // Heatmap por zonas:
+                // pontos muito próximos são agrupados numa só zona.
+                // A cor da zona usa o maior valor de metano dessa zona,
+                // não a quantidade de pontos acumulados.
+                const zoneSizeDegrees = 0.00004;  // aproximadamente 3 a 5 metros
+                const zones = {};
+
+                for (const point of points) {
+                    const latitude = Number(point.latitude);
+                    const longitude = Number(point.longitude);
+
+                    if (isNaN(latitude) || isNaN(longitude)) {
+                        continue;
                     }
-                });
+
+                    const methaneValue = clampMethaneValue(point.methane_percent);
+
+                    const latKey = Math.round(latitude / zoneSizeDegrees);
+                    const lngKey = Math.round(longitude / zoneSizeDegrees);
+                    const key = latKey + ":" + lngKey;
+
+                    if (!zones[key]) {
+                        zones[key] = {
+                            latitudeSum: 0,
+                            longitudeSum: 0,
+                            count: 0,
+                            maxMethane: 0,
+                            timestamp: "-",
+                            mq4Raw: "-",
+                            baseline: "-"
+                        };
+                    }
+
+                    zones[key].latitudeSum += latitude;
+                    zones[key].longitudeSum += longitude;
+                    zones[key].count += 1;
+
+                    if (methaneValue >= zones[key].maxMethane) {
+                        zones[key].maxMethane = methaneValue;
+                        zones[key].timestamp = point.timestamp || "-";
+                        zones[key].mq4Raw = point.mq4_raw || "-";
+                        zones[key].baseline = point.baseline || "-";
+                    }
+                }
+
+                heatLayer = L.layerGroup();
+
+                for (const key in zones) {
+                    const zone = zones[key];
+
+                    const latitude = zone.latitudeSum / zone.count;
+                    const longitude = zone.longitudeSum / zone.count;
+                    const methaneValue = zone.maxMethane;
+                    const color = getColor(methaneValue);
+
+                    const circle = L.circle(
+                        [latitude, longitude],
+                        {
+                            radius: 5,
+                            color: color,
+                            fillColor: color,
+                            fillOpacity: 0.35,
+                            opacity: 0.70,
+                            weight: 1
+                        }
+                    );
+
+                    circle.bindPopup(
+                        "<b>Máximo metano nesta zona:</b> " + formatPercent(methaneValue) + "<br>" +
+                        "<b>N.º de pontos na zona:</b> " + zone.count + "<br>" +
+                        "<b>Timestamp do máximo:</b> " + zone.timestamp + "<br>" +
+                        "<b>Latitude média:</b> " + latitude.toFixed(6) + "<br>" +
+                        "<b>Longitude média:</b> " + longitude.toFixed(6) + "<br>" +
+                        "<b>Raw no máximo:</b> " + zone.mq4Raw + "<br>" +
+                        "<b>Baseline:</b> " + zone.baseline
+                    );
+
+                    circle.addTo(heatLayer);
+                }
             }
 
             function removeAllDataLayers() {
@@ -1122,6 +1177,19 @@ def live():
                 background-color: #f2f2f2;
                 position: sticky;
                 top: 0;
+                z-index: 2;
+            }
+
+            #dataTable tbody tr:nth-child(odd) {
+                background-color: #f8fbff;
+            }
+
+            #dataTable tbody tr:nth-child(even) {
+                background-color: #ffffff;
+            }
+
+            #dataTable tbody tr:hover {
+                background-color: #eef5ff;
             }
 
             button {
@@ -1438,10 +1506,21 @@ def live():
                     "Minuto " + (currentPage + 1) + " / " + pages.length;
             }
 
+            function isTableNearBottom(container) {
+                const threshold = 40;
+
+                return (
+                    container.scrollTop + container.clientHeight >=
+                    container.scrollHeight - threshold
+                );
+            }
+
             function renderTable() {
                 const config = getActiveConfig();
                 const tbody = document.querySelector("#dataTable tbody");
                 const container = document.getElementById("tableContainer");
+
+                const shouldFollowNewValues = isTableNearBottom(container);
 
                 tbody.innerHTML = "";
 
@@ -1469,7 +1548,9 @@ def live():
                     tbody.appendChild(tr);
                 }
 
-                container.scrollTop = container.scrollHeight;
+                if (shouldFollowNewValues) {
+                    container.scrollTop = container.scrollHeight;
+                }
             }
 
             function renderSummary() {
